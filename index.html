@@ -725,7 +725,7 @@ function CapitalVault() {
       const objectsData = await objectsResponse.json();
       
       // 分析 portfolio
-      const portfolio = [];
+      const tokenList = [];
       const defiProtocols = {
         'scallop': 'Scallop',
         'navi': 'Navi',
@@ -740,7 +740,7 @@ function CapitalVault() {
       
       // 添加 SUI 餘額
       if (balance > 0) {
-        portfolio.push({ type: 'token', name: 'SUI', amount: balance.toFixed(4), protocol: 'Wallet' });
+        tokenList.push({ type: 'token', name: 'SUI', amount: balance.toFixed(4), rawAmount: balance, protocol: 'Wallet' });
       }
       
       // 分析其他代幣
@@ -752,11 +752,15 @@ function CapitalVault() {
               // 提取代幣名稱
               const typeParts = bal.coinType.split('::');
               const tokenName = typeParts[typeParts.length - 1] || 'Unknown';
-              portfolio.push({ type: 'token', name: tokenName, amount: amount.toFixed(4), protocol: 'Wallet' });
+              tokenList.push({ type: 'token', name: tokenName, amount: amount.toFixed(4), rawAmount: amount, protocol: 'Wallet' });
             }
           }
         }
       }
+      
+      // 按數量排序，只取前3大代幣
+      tokenList.sort((a, b) => b.rawAmount - a.rawAmount);
+      const portfolio = tokenList.slice(0, 3).map(({ rawAmount, ...rest }) => rest);
       
       // 分析 DeFi 位置
       if (objectsData.result?.data) {
@@ -769,8 +773,9 @@ function CapitalVault() {
             }
           }
         }
-        // 添加 DeFi 協議
-        for (const [protocol, count] of Object.entries(protocolCounts)) {
+        // 添加 DeFi 協議（最多3個）
+        const defiList = Object.entries(protocolCounts).slice(0, 3);
+        for (const [protocol, count] of defiList) {
           portfolio.push({ type: 'defi', name: protocol, amount: `${count} positions`, protocol });
         }
       }
@@ -1006,7 +1011,7 @@ function CapitalVault() {
             note: form.note,
             book: '0xmedia',
             timestamp: new Date(form.date).getTime(),
-            recordedBy: currentUser,
+            recordedBy: form.originalCreator || currentUser, // 使用原始創建人
             createdAt: Date.now(),
             distributionFor: 'oxmedia'
           });
@@ -1028,7 +1033,7 @@ function CapitalVault() {
             note: form.note,
             book: 'work',
             timestamp: new Date(form.date).getTime(),
-            recordedBy: 'joe',
+            recordedBy: form.originalCreator || currentUser, // 原始創建人
             createdAt: Date.now(),
             distributionFor: 'joe'
           });
@@ -1050,7 +1055,7 @@ function CapitalVault() {
             note: form.note,
             book: 'work',
             timestamp: new Date(form.date).getTime(),
-            recordedBy: 'hedda',
+            recordedBy: form.originalCreator || currentUser, // 原始創建人
             createdAt: Date.now(),
             distributionFor: 'hedda'
           });
@@ -1122,7 +1127,7 @@ function CapitalVault() {
           note: form.note,
           book: 'work',
           timestamp: new Date(form.date).getTime(),
-          recordedBy: 'joe',
+          recordedBy: currentUser, // 創建人
           createdAt: Date.now(),
           distributionFor: 'joe'
         });
@@ -1144,7 +1149,7 @@ function CapitalVault() {
           note: form.note,
           book: 'work',
           timestamp: new Date(form.date).getTime(),
-          recordedBy: 'hedda',
+          recordedBy: currentUser, // 創建人
           createdAt: Date.now(),
           distributionFor: 'hedda'
         });
@@ -1196,9 +1201,23 @@ function CapitalVault() {
   const confirmDelete = () => {
     if (deleteConfirm) {
       const tx = transactions.find(t => t.id === deleteConfirm);
-      // Firebase: 刪除交易
-      db.collection('transactions').doc(deleteConfirm).delete();
-      addNotification('delete', { amount: tx?.amount, currency: tx?.currency });
+      
+      // 如果是項目收益，刪除所有相關記錄
+      if (tx?.type === 'project' && tx?.projectId) {
+        const relatedTxs = transactions.filter(t => t.projectId === tx.projectId);
+        const batch = db.batch();
+        relatedTxs.forEach(t => {
+          batch.delete(db.collection('transactions').doc(t.id));
+        });
+        batch.commit()
+          .then(() => console.log('Project income deleted:', relatedTxs.length, 'records'))
+          .catch(err => console.error('Delete failed:', err));
+        addNotification('delete', { amount: tx?.amount, currency: tx?.currency, note: tx?.projectName + ' (全部)' });
+      } else {
+        // 普通交易，只刪除單條
+        db.collection('transactions').doc(deleteConfirm).delete();
+        addNotification('delete', { amount: tx?.amount, currency: tx?.currency });
+      }
       setDeleteConfirm(null);
     }
   };
@@ -1208,6 +1227,10 @@ function CapitalVault() {
     if (tx.type === 'project' && tx.projectId) {
       // 找到同一個 projectId 的所有記錄
       const relatedTxs = transactions.filter(t => t.projectId === tx.projectId);
+      
+      // 找到原始創建人（從 0xmedia 記錄中獲取）
+      const oxmediaTx = relatedTxs.find(t => t.distributionFor === 'oxmedia');
+      const originalCreator = oxmediaTx?.recordedBy || tx.recordedBy || currentUser;
       
       // 構建 distribution 對象
       const distribution = {
@@ -1234,7 +1257,8 @@ function CapitalVault() {
         date: new Date(tx.timestamp).toISOString().split('T')[0],
         book: '0xmedia',
         note: tx.note || '',
-        distribution
+        distribution,
+        originalCreator // 保存原始創建人
       });
       setEditingId(tx.projectId); // 使用 projectId 作為編輯 ID
     } else {
@@ -1486,8 +1510,47 @@ function CapitalVault() {
       else { stats.totalOut += tx.amount; stats.byCategory[tx.category] = (stats.byCategory[tx.category] || 0) + tx.amount; }
       if (!stats.byCurrency[tx.currency]) stats.byCurrency[tx.currency] = { in: 0, out: 0 };
       stats.byCurrency[tx.currency][adjustedDirection] += tx.amount;
-      if (tx.recordedBy && stats.byUser[tx.recordedBy]) stats.byUser[tx.recordedBy][tx.direction] += tx.amount;
+      
+      // 個人統計
+      if (tx.type === 'project' && tx.distributionFor) {
+        if (tx.distributionFor === 'oxmedia') {
+          // 0xMedia 的部分：加到創建人的收入（表示他給 0xMedia 帶來收入）
+          if (tx.recordedBy && stats.byUser[tx.recordedBy]) {
+            stats.byUser[tx.recordedBy].in += tx.amount;
+          }
+        } else if (stats.byUser[tx.distributionFor]) {
+          // Joe 或 Hedda 的部分：加到各自的收入
+          stats.byUser[tx.distributionFor].in += tx.amount;
+        }
+      } else if (tx.type === 'binance') {
+        // 幣安內轉：記錄者和對方都要更新
+        const recorder = tx.recordedBy;
+        const counterparty = tx.counterparty?.toLowerCase();
+        if (recorder && stats.byUser[recorder]) {
+          stats.byUser[recorder][tx.direction] += tx.amount;
+        }
+        // 對方也要記錄（方向相反）
+        if (counterparty && stats.byUser[counterparty]) {
+          const oppositeDir = tx.direction === 'in' ? 'out' : 'in';
+          stats.byUser[counterparty][oppositeDir] += tx.amount;
+        }
+      } else if (tx.recordedBy && stats.byUser[tx.recordedBy]) {
+        // 其他類型按 recordedBy 計算
+        stats.byUser[tx.recordedBy][tx.direction] += tx.amount;
+      }
     });
+    
+    // 在 work 帳本中，補充計算其他用戶的項目收益（因為 filteredTransactions 只顯示當前用戶的）
+    if (currentBook === 'work') {
+      transactions
+        .filter(tx => tx.book === 'work' && tx.type === 'project' && tx.distributionFor && tx.distributionFor !== currentUser)
+        .forEach(tx => {
+          if (stats.byUser[tx.distributionFor]) {
+            stats.byUser[tx.distributionFor].in += tx.amount;
+          }
+        });
+    }
+    
     return stats;
   };
 
@@ -1809,10 +1872,37 @@ function CapitalVault() {
                 if (file) {
                   const reader = new FileReader();
                   reader.onloadend = () => {
-                    const coverData = reader.result;
-                    setCovers(prev => ({ ...prev, [currentBook]: coverData }));
-                    // Firebase: 同步封面
-                    db.collection('settings').doc('covers').set({ [currentBook]: coverData }, { merge: true });
+                    // 壓縮圖片
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const maxWidth = 800;
+                      const maxHeight = 400;
+                      let width = img.width;
+                      let height = img.height;
+                      
+                      if (width > maxWidth) {
+                        height = height * (maxWidth / width);
+                        width = maxWidth;
+                      }
+                      if (height > maxHeight) {
+                        width = width * (maxHeight / height);
+                        height = maxHeight;
+                      }
+                      
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      ctx.drawImage(img, 0, 0, width, height);
+                      
+                      const coverData = canvas.toDataURL('image/jpeg', 0.6);
+                      setCovers(prev => ({ ...prev, [currentBook]: coverData }));
+                      // Firebase: 同步封面
+                      db.collection('settings').doc('covers').set({ [currentBook]: coverData }, { merge: true })
+                        .then(() => console.log('Cover saved'))
+                        .catch(err => console.error('Cover save failed:', err));
+                    };
+                    img.src = reader.result;
                   };
                   reader.readAsDataURL(file);
                 }
