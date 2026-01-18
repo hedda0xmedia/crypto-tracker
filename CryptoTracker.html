@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Crypto Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: #000; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overscroll-behavior: none;
+    }
+    input, select, textarea, button { font-family: inherit; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script>
+    // ⚠️ 重要：把這裡換成你自己的 Firebase 配置
+    // 👇👇👇 Firebase 配置開始 👇👇👇
+    const firebaseConfig = {
+      apiKey: "AIzaSyBcNajKPlCsFzt0lGEs6dQESc4-5hpri38",
+      authDomain: "crypto-tracker-c5438.firebaseapp.com",
+      databaseURL: "https://crypto-tracker-c5438-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "crypto-tracker-c5438",
+      storageBucket: "crypto-tracker-c5438.firebasestorage.app",
+      messagingSenderId: "324851797341",
+      appId: "1:324851797341:web:ec57c5d96c8e3bd6876cb4"
+    };
+    // 👆👆👆 Firebase 配置結束 👆👆👆
+    
+    // Initialize Firebase
+    let db = null;
+    let firebaseEnabled = false;
+    
+    try {
+      if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        firebaseEnabled = true;
+        console.log("✅ Firebase 連接成功！");
+      } else {
+        console.log("⚠️ Firebase 未配置，使用本地存儲");
+      }
+    } catch (e) {
+      console.log("❌ Firebase 連接失敗，使用本地存儲", e);
+    }
+  </script>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // Icons
+    const Icon = ({ name, size = 24, className = "" }) => {
+      const icons = {
+        wallet: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>,
+        plus: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>,
+        arrowDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></svg>,
+        arrowUp: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h10"/><path d="M11 16h7"/><path d="M11 20h4"/></svg>,
+        list: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+        chart: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>,
+        user: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>,
+        logout: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+        globe: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+        camera: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>,
+        x: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+        check: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
+        edit: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
+        trash: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+        file: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>,
+        download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+        briefcase: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+        building: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>,
+        search: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+        loader: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+        externalLink: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>,
+        refresh: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
+        cloud: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>,
+        cloudOff: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg>,
+      };
+      return icons[name] || null;
+    };
+
+    const STORAGE_KEY = 'crypto-tracker-data-v2';
+
+    const CryptoTracker = () => {
+      const [currentUser, setCurrentUser] = useState(null);
+      const [transactions, setTransactions] = useState([]);
+      const [currentBook, setCurrentBook] = useState('work');
+      const [view, setView] = useState('list');
+      const [editingId, setEditingId] = useState(null);
+      const [lang, setLang] = useState('zh');
+      const [avatars, setAvatars] = useState({ hedda: null, joe: null });
+      const [txLoading, setTxLoading] = useState(false);
+      const [txError, setTxError] = useState('');
+      const [syncing, setSyncing] = useState(false);
+      const [lastSync, setLastSync] = useState(null);
+      const [isOnline, setIsOnline] = useState(firebaseEnabled);
+
+      const t = {
+        zh: {
+          title: 'Crypto Tracker',
+          selectAccount: '選擇帳號登入',
+          login: '點擊登入',
+          onlyFor: '僅限 Hedda 和 Joe 使用',
+          loggedIn: '已登入',
+          work: '工作',
+          treasury: '0xMedia 國庫',
+          income: '收入',
+          expense: '支出',
+          balance: '淨額',
+          noRecords: '還沒有記錄',
+          tapToAdd: '點擊下方 + 開始記錄',
+          binance: '幣安內轉',
+          onchain: '鏈上轉帳',
+          receive: '收款',
+          send: '轉出',
+          from: '來自',
+          to: '轉給',
+          uploadScreenshot: '上傳截圖',
+          amount: '金額',
+          category: '分類',
+          note: '備註',
+          save: '保存記錄',
+          update: '更新記錄',
+          cancel: '取消',
+          edit: '編輯',
+          add: '新增',
+          stats: '統計',
+          records: '記錄',
+          personalStats: '個人統計',
+          currencyStats: '幣種統計',
+          expenseCategory: '支出分類',
+          noData: '暫無數據',
+          recorded: '記錄',
+          confirmDelete: '確定要刪除？',
+          enterAmount: '請填寫金額',
+          counterparty: '對方',
+          orderId: '訂單編號',
+          txHash: '交易哈希 (TX Hash)',
+          selectChain: '選擇鏈',
+          sender: '發送方',
+          recipient: '接收方',
+          exportExcel: '導出 CSV',
+          date: '日期',
+          source: '來源',
+          txNotFound: '找不到交易',
+          queryFailed: '查詢失敗',
+          viewOnExplorer: '在瀏覽器查看',
+          createdBy: '由 {name} 創建',
+          cloudSync: '雲端同步中',
+          localOnly: '本地模式',
+          synced: '已同步'
+        },
+        en: {
+          title: 'Crypto Tracker',
+          selectAccount: 'Select Account',
+          login: 'Tap to login',
+          onlyFor: 'For Hedda & Joe only',
+          loggedIn: 'Logged in',
+          work: 'Work',
+          treasury: '0xMedia Treasury',
+          income: 'Income',
+          expense: 'Expense',
+          balance: 'Balance',
+          noRecords: 'No records yet',
+          tapToAdd: 'Tap + to add',
+          binance: 'Binance Transfer',
+          onchain: 'On-chain',
+          receive: 'Receive',
+          send: 'Send',
+          from: 'From',
+          to: 'To',
+          uploadScreenshot: 'Upload screenshot',
+          amount: 'Amount',
+          category: 'Category',
+          note: 'Note',
+          save: 'Save',
+          update: 'Update',
+          cancel: 'Cancel',
+          edit: 'Edit',
+          add: 'Add',
+          stats: 'Stats',
+          records: 'Records',
+          personalStats: 'Personal Stats',
+          currencyStats: 'Currency Stats',
+          expenseCategory: 'Expense by Category',
+          noData: 'No data',
+          recorded: 'recorded',
+          confirmDelete: 'Delete this record?',
+          enterAmount: 'Please enter amount',
+          counterparty: 'Counterparty',
+          orderId: 'Order ID',
+          txHash: 'TX Hash',
+          selectChain: 'Select Chain',
+          sender: 'Sender',
+          recipient: 'Recipient',
+          exportExcel: 'Export CSV',
+          date: 'Date',
+          source: 'Source',
+          txNotFound: 'Transaction not found',
+          queryFailed: 'Query failed',
+          viewOnExplorer: 'View on Explorer',
+          createdBy: 'Created by {name}',
+          cloudSync: 'Cloud syncing',
+          localOnly: 'Local mode',
+          synced: 'Synced'
+        }
+      };
+
+      const txt = t[lang];
+
+      const users = {
+        hedda: { name: 'Hedda', color: '#BE123C' },
+        joe: { name: 'Joe', color: '#1D4ED8' }
+      };
+
+      const getCounterparty = () => currentUser === 'hedda' ? 'Joe' : 'Hedda';
+
+      const books = [
+        { id: 'work', name: txt.work, icon: 'briefcase', color: '#BE123C' },
+        { id: '0xmedia', name: txt.treasury, icon: 'building', color: '#B45309' }
+      ];
+
+      const [form, setForm] = useState({
+        type: 'binance',
+        direction: 'in',
+        amount: '',
+        currency: 'USDT',
+        category: '工作',
+        counterparty: '',
+        note: '',
+        screenshot: null,
+        date: new Date().toISOString().split('T')[0],
+        txHash: '',
+        chain: 'bsc',
+        book: 'work',
+        orderId: '',
+        sender: '',
+        recipient: ''
+      });
+
+      const categories = [
+        { id: '工作', zh: '工作', en: 'Work' },
+        { id: '投資', zh: '投資', en: 'Investment' },
+        { id: '其他', zh: '其他', en: 'Other' }
+      ];
+      
+      const currencies = ['USDT', 'USDC', 'ETH', 'BNB', 'SUI', 'BTC', 'TWD', 'USD'];
+      
+      const chains = [
+        { id: 'bsc', name: 'BSC', symbol: 'BNB', explorer: 'https://bscscan.com/tx/', color: '#F3BA2F' },
+        { id: 'eth', name: 'Ethereum', symbol: 'ETH', explorer: 'https://etherscan.io/tx/', color: '#627EEA' },
+        { id: 'polygon', name: 'Polygon', symbol: 'MATIC', explorer: 'https://polygonscan.com/tx/', color: '#8247E5' },
+        { id: 'arbitrum', name: 'Arbitrum', symbol: 'ETH', explorer: 'https://arbiscan.io/tx/', color: '#28A0F0' },
+        { id: 'sui', name: 'Sui', symbol: 'SUI', explorer: 'https://suivision.xyz/txblock/', color: '#6FBCF0' },
+        { id: 'base', name: 'Base', symbol: 'ETH', explorer: 'https://basescan.org/tx/', color: '#0052FF' },
+      ];
+
+      // ==================== FIREBASE SYNC ====================
+      useEffect(() => {
+        if (!firebaseEnabled || !db) return;
+        
+        // Listen for realtime updates
+        const unsubscribe = db.ref('cryptoTracker').on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            if (data.transactions) {
+              const txArray = Object.values(data.transactions).sort((a, b) => b.timestamp - a.timestamp);
+              setTransactions(txArray);
+            }
+            if (data.avatars) setAvatars(data.avatars);
+          }
+          setLastSync(new Date());
+          setSyncing(false);
+        });
+        
+        return () => db.ref('cryptoTracker').off('value', unsubscribe);
+      }, []);
+
+      // Load from localStorage as fallback
+      useEffect(() => {
+        if (firebaseEnabled) return;
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const data = JSON.parse(saved);
+            if (data.transactions) setTransactions(data.transactions);
+            if (data.avatars) setAvatars(data.avatars);
+            if (data.currentUser) setCurrentUser(data.currentUser);
+            if (data.lang) setLang(data.lang);
+          }
+        } catch (e) {
+          console.log('Load error:', e);
+        }
+      }, []);
+
+      // Save to localStorage as fallback
+      useEffect(() => {
+        if (firebaseEnabled) return;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ transactions, avatars, currentUser, lang }));
+        } catch (e) {
+          console.log('Save error:', e);
+        }
+      }, [transactions, avatars, currentUser, lang]);
+
+      const saveToFirebase = async (newTransactions, newAvatars = avatars) => {
+        if (!firebaseEnabled || !db) return;
+        setSyncing(true);
+        try {
+          const txObject = {};
+          newTransactions.forEach(tx => { txObject[tx.id] = tx; });
+          await db.ref('cryptoTracker').set({
+            transactions: txObject,
+            avatars: newAvatars,
+            lastUpdated: Date.now()
+          });
+        } catch (e) {
+          console.error('Firebase save error:', e);
+        }
+        setSyncing(false);
+      };
+
+      const toggleLang = () => setLang(lang === 'zh' ? 'en' : 'zh');
+
+      const handleAvatarUpload = (userId, e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const newAvatars = { ...avatars, [userId]: reader.result };
+            setAvatars(newAvatars);
+            saveToFirebase(transactions, newAvatars);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleScreenshotUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => setForm(prev => ({ ...prev, screenshot: reader.result }));
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const shortenAddress = (addr) => {
+        if (!addr || addr.length < 20) return addr;
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+      };
+
+      const fetchTransaction = async () => {
+        if (!form.txHash) return;
+        setTxLoading(true);
+        setTxError('');
+        
+        const chain = chains.find(c => c.id === form.chain);
+        
+        try {
+          if (form.chain === 'sui') {
+            const response = await fetch('https://fullnode.mainnet.sui.io:443', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0', id: 1, method: 'sui_getTransactionBlock',
+                params: [form.txHash, { showInput: true, showEffects: true, showBalanceChanges: true }]
+              })
+            });
+            const data = await response.json();
+            if (data.result) {
+              const tx = data.result;
+              const sender = tx.transaction?.data?.sender || '';
+              const balanceChanges = tx.balanceChanges || [];
+              let amount = 0, recipient = '';
+              for (const bc of balanceChanges) {
+                const amt = parseFloat(bc.amount) / 1e9;
+                if (amt > 0 && bc.owner?.AddressOwner !== sender) {
+                  amount = amt;
+                  recipient = bc.owner?.AddressOwner || '';
+                  break;
+                }
+              }
+              if (amount === 0 && balanceChanges.length > 0) amount = Math.abs(parseFloat(balanceChanges[0].amount)) / 1e9;
+              setForm(prev => ({ ...prev, amount: amount.toFixed(4), currency: 'SUI', sender, recipient: recipient || (balanceChanges[1]?.owner?.AddressOwner || '') }));
+            } else setTxError(txt.txNotFound);
+          } else {
+            const rpcEndpoints = { eth: 'https://eth.llamarpc.com', bsc: 'https://bsc-dataseed1.binance.org', polygon: 'https://polygon-rpc.com', arbitrum: 'https://arb1.arbitrum.io/rpc', base: 'https://mainnet.base.org' };
+            const response = await fetch(rpcEndpoints[form.chain], {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionByHash', params: [form.txHash] })
+            });
+            const data = await response.json();
+            if (data.result) {
+              const tx = data.result;
+              const value = parseInt(tx.value, 16) / 1e18;
+              setForm(prev => ({ ...prev, amount: value > 0 ? value.toFixed(6) : prev.amount, currency: chain?.symbol || 'ETH', sender: tx.from || '', recipient: tx.to || '' }));
+            } else setTxError(txt.txNotFound);
+          }
+        } catch (error) {
+          console.error('Fetch error:', error);
+          setTxError(txt.queryFailed);
+        }
+        setTxLoading(false);
+      };
+
+      const openExplorer = () => {
+        if (!form.txHash) return;
+        const chain = chains.find(c => c.id === form.chain);
+        if (chain) window.open(chain.explorer + form.txHash, '_blank');
+      };
+
+      const addTransaction = () => {
+        if (!form.amount || parseFloat(form.amount) <= 0) {
+          alert(txt.enterAmount);
+          return;
+        }
+        
+        const newTx = {
+          id: editingId || Date.now().toString(),
+          ...form,
+          amount: parseFloat(form.amount),
+          timestamp: new Date(form.date).getTime(),
+          recordedBy: currentUser,
+          createdAt: editingId ? undefined : Date.now(),
+          updatedAt: Date.now()
+        };
+
+        let newTransactions;
+        if (editingId) {
+          newTransactions = transactions.map(t => t.id === editingId ? { ...newTx, createdAt: t.createdAt } : t);
+          setEditingId(null);
+        } else {
+          newTransactions = [newTx, ...transactions];
+        }
+        
+        setTransactions(newTransactions);
+        saveToFirebase(newTransactions);
+        resetForm();
+        setView('list');
+      };
+
+      const resetForm = () => {
+        setForm({
+          type: 'binance', direction: 'in', amount: '', currency: 'USDT', category: '工作',
+          counterparty: getCounterparty(), note: '', screenshot: null,
+          date: new Date().toISOString().split('T')[0], txHash: '', chain: 'bsc',
+          book: currentBook, orderId: '', sender: '', recipient: ''
+        });
+        setTxError('');
+      };
+
+      const deleteTransaction = (id) => {
+        if (confirm(txt.confirmDelete)) {
+          const newTransactions = transactions.filter(t => t.id !== id);
+          setTransactions(newTransactions);
+          saveToFirebase(newTransactions);
+        }
+      };
+
+      const editTransaction = (tx) => {
+        setForm({ ...tx, amount: tx.amount.toString(), date: new Date(tx.timestamp).toISOString().split('T')[0] });
+        setEditingId(tx.id);
+        setView('add');
+      };
+
+      const filteredTransactions = transactions.filter(tx => tx.book === currentBook);
+
+      const getStats = () => {
+        const stats = { totalIn: 0, totalOut: 0, byCategory: {}, byCurrency: {}, byUser: { hedda: { in: 0, out: 0 }, joe: { in: 0, out: 0 } } };
+        filteredTransactions.forEach(tx => {
+          if (tx.direction === 'in') stats.totalIn += tx.amount;
+          else {
+            stats.totalOut += tx.amount;
+            stats.byCategory[tx.category] = (stats.byCategory[tx.category] || 0) + tx.amount;
+          }
+          if (!stats.byCurrency[tx.currency]) stats.byCurrency[tx.currency] = { in: 0, out: 0 };
+          stats.byCurrency[tx.currency][tx.direction] += tx.amount;
+          if (tx.recordedBy && stats.byUser[tx.recordedBy]) stats.byUser[tx.recordedBy][tx.direction] += tx.amount;
+        });
+        return stats;
+      };
+
+      const exportToCSV = () => {
+        const bookName = currentBook === '0xmedia' ? '0xMedia_Treasury' : 'Work';
+        const headers = ['Date', 'IN', 'OUT', 'Currency', 'Source', 'Sender', 'Recipient', 'Category', 'Note', 'Created By'];
+        const rows = filteredTransactions.map(tx => [
+          new Date(tx.timestamp).toISOString().split('T')[0],
+          tx.direction === 'in' ? tx.amount : '',
+          tx.direction === 'out' ? tx.amount : '',
+          tx.currency,
+          tx.type === 'binance' ? `Binance (${tx.orderId || 'N/A'})` : `${chains.find(c => c.id === tx.chain)?.name || tx.chain}`,
+          tx.type === 'onchain' ? tx.sender : (tx.direction === 'in' ? tx.counterparty : users[currentUser]?.name),
+          tx.type === 'onchain' ? tx.recipient : (tx.direction === 'out' ? tx.counterparty : users[currentUser]?.name),
+          getCategoryLabel(tx.category), tx.note || '', users[tx.recordedBy]?.name || ''
+        ]);
+        const stats = getStats();
+        rows.push([]);
+        rows.push(['TOTAL', stats.totalIn, stats.totalOut, '', '', '', '', '', `Balance: ${(stats.totalIn - stats.totalOut).toFixed(2)}`, '']);
+        const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${bookName}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const formatDate = (ts) => new Date(ts).toISOString().split('T')[0];
+      const getChainInfo = (id) => chains.find(c => c.id === id);
+      const getCurrentBook = () => books.find(b => b.id === currentBook);
+      const getCategoryLabel = (id) => categories.find(c => c.id === id)?.[lang] || id;
+
+      const Avatar = ({ userId, size = 48, editable = false }) => (
+        <div className="relative" style={{ width: size, height: size }}>
+          {avatars[userId] ? (
+            <img src={avatars[userId]} alt={users[userId]?.name} className="w-full h-full object-cover rounded-full" style={{ border: `3px solid ${users[userId]?.color}` }} />
+          ) : (
+            <div className="w-full h-full rounded-full flex items-center justify-center bg-zinc-800" style={{ border: `3px solid ${users[userId]?.color}` }}>
+              <Icon name="user" size={size * 0.5} className="text-zinc-500" />
+            </div>
+          )}
+          {editable && (
+            <label className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
+              <Icon name="camera" size={size * 0.3} className="text-white" />
+              <input type="file" accept="image/*" onChange={(e) => handleAvatarUpload(userId, e)} className="hidden" />
+            </label>
+          )}
+        </div>
+      );
+
+      // ==================== LOGIN ====================
+      if (!currentUser) {
+        return (
+          <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8">
+            <button onClick={toggleLang} className="absolute top-6 right-6 p-3 text-zinc-500 hover:text-white hover:bg-zinc-900 rounded-xl transition">
+              <Icon name="globe" size={20} />
+            </button>
+            
+            <div className="mb-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-red-900 to-red-800 flex items-center justify-center">
+                <Icon name="wallet" size={28} className="text-white" />
+              </div>
+              <h1 className="text-3xl font-light text-white tracking-tight">{txt.title}</h1>
+              <p className="text-zinc-600 text-sm mt-3">{txt.selectAccount}</p>
+            </div>
+            
+            <div className="w-full max-w-sm space-y-4">
+              {['hedda', 'joe'].map(userId => (
+                <div key={userId} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex items-center gap-5">
+                  <Avatar userId={userId} size={64} editable />
+                  <button onClick={() => { setCurrentUser(userId); setForm(prev => ({ ...prev, counterparty: userId === 'hedda' ? 'Joe' : 'Hedda' })); }} className="flex-1 text-left">
+                    <div className="text-white font-medium text-xl tracking-tight">{users[userId].name}</div>
+                    <div className="text-zinc-600 text-sm mt-1">{txt.login}</div>
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-12 flex items-center gap-2">
+              <Icon name={firebaseEnabled ? "cloud" : "cloudOff"} size={16} className={firebaseEnabled ? "text-emerald-500" : "text-zinc-600"} />
+              <span className={`text-xs ${firebaseEnabled ? "text-emerald-500" : "text-zinc-600"}`}>
+                {firebaseEnabled ? txt.cloudSync : txt.localOnly}
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      const stats = getStats();
+      const currentBookData = getCurrentBook();
+
+      // ==================== MAIN ====================
+      return (
+        <div className="min-h-screen bg-black text-white pb-28">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-5 sticky top-0 z-20 bg-black/95 backdrop-blur-xl border-b border-zinc-900">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <Avatar userId={currentUser} size={48} />
+                <div>
+                  <div className="text-white font-medium text-lg tracking-tight">{users[currentUser].name}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className={`w-2 h-2 rounded-full ${firebaseEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+                    <span className="text-zinc-600 text-xs">{firebaseEnabled ? txt.synced : txt.localOnly}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={toggleLang} className="p-2.5 text-zinc-500 hover:text-white hover:bg-zinc-900 rounded-xl transition">
+                  <Icon name="globe" size={18} />
+                </button>
+                <button onClick={() => setCurrentUser(null)} className="p-2.5 text-zinc-500 hover:text-white hover:bg-zinc-900 rounded-xl transition">
+                  <Icon name="logout" size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {books.map(book => (
+                <button key={book.id} onClick={() => setCurrentBook(book.id)}
+                  className={`flex-shrink-0 px-5 py-3 rounded-2xl font-medium transition-all flex items-center gap-2.5 ${currentBook === book.id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-400'}`}>
+                  <Icon name={book.icon} size={16} style={currentBook === book.id ? { color: book.color } : {}} />
+                  <span className="text-sm whitespace-nowrap">{book.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="px-6 py-5">
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              <div className="flex-shrink-0 bg-emerald-500/5 border border-zinc-900 rounded-2xl p-5 min-w-32">
+                <div className="text-zinc-500 text-xs mb-2">{txt.income}</div>
+                <div className="font-semibold text-2xl tracking-tight text-emerald-500">{stats.totalIn.toFixed(2)}</div>
+              </div>
+              <div className="flex-shrink-0 bg-red-500/5 border border-zinc-900 rounded-2xl p-5 min-w-32">
+                <div className="text-zinc-500 text-xs mb-2">{txt.expense}</div>
+                <div className="font-semibold text-2xl tracking-tight text-red-500">{stats.totalOut.toFixed(2)}</div>
+              </div>
+              <div className="flex-shrink-0 bg-zinc-900 border border-zinc-900 rounded-2xl p-5 min-w-32">
+                <div className="text-zinc-500 text-xs mb-2">{txt.balance}</div>
+                <div className={`font-semibold text-2xl tracking-tight ${stats.totalIn - stats.totalOut >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {(stats.totalIn - stats.totalOut).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6">
+            {/* LIST */}
+            {view === 'list' && (
+              <div className="space-y-4">
+                {filteredTransactions.length === 0 ? (
+                  <div className="text-center py-20">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-zinc-900 rounded-3xl flex items-center justify-center">
+                      <Icon name={currentBookData?.icon || 'briefcase'} size={32} className="text-zinc-700" />
+                    </div>
+                    <p className="text-zinc-500 text-lg font-light">{txt.noRecords}</p>
+                    <p className="text-zinc-700 text-sm mt-2">{txt.tapToAdd}</p>
+                  </div>
+                ) : (
+                  filteredTransactions.map(tx => (
+                    <div key={tx.id} className="bg-zinc-900/50 border border-zinc-900 rounded-3xl p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${tx.direction === 'in' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                            <Icon name={tx.direction === 'in' ? 'arrowDown' : 'arrowUp'} size={20} className={tx.direction === 'in' ? 'text-emerald-500' : 'text-red-500'} />
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">
+                              {tx.type === 'binance' ? `${tx.direction === 'in' ? txt.from : txt.to} ${tx.counterparty}` : (tx.direction === 'in' ? txt.receive : txt.send)}
+                            </div>
+                            <div className="text-xs text-zinc-600 flex items-center gap-2 mt-1.5 flex-wrap">
+                              {tx.type === 'binance' ? (
+                                <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-500 text-xs">{txt.binance}</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-lg text-xs" style={{ backgroundColor: `${getChainInfo(tx.chain)?.color}15`, color: getChainInfo(tx.chain)?.color }}>
+                                  {getChainInfo(tx.chain)?.name}
+                                </span>
+                              )}
+                              <span>{formatDate(tx.timestamp)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-semibold text-xl ${tx.direction === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {tx.direction === 'in' ? '+' : '-'}{tx.amount}
+                            <span className="text-sm ml-1 text-zinc-500 font-normal">{tx.currency}</span>
+                          </div>
+                          <div className="text-xs text-zinc-600 mt-1">{getCategoryLabel(tx.category)}</div>
+                        </div>
+                      </div>
+                      
+                      {tx.type === 'onchain' && (tx.sender || tx.recipient) && (
+                        <div className="mt-4 bg-black/30 rounded-xl p-4 space-y-2">
+                          {tx.sender && <div className="flex items-center justify-between text-xs"><span className="text-zinc-500">{txt.sender}</span><span className="text-zinc-300 font-mono">{shortenAddress(tx.sender)}</span></div>}
+                          {tx.recipient && <div className="flex items-center justify-between text-xs"><span className="text-zinc-500">{txt.recipient}</span><span className="text-zinc-300 font-mono">{shortenAddress(tx.recipient)}</span></div>}
+                          {tx.txHash && <a href={`${getChainInfo(tx.chain)?.explorer}${tx.txHash}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2"><Icon name="externalLink" size={10} />{txt.viewOnExplorer}</a>}
+                        </div>
+                      )}
+                      
+                      {tx.orderId && <div className="mt-4 text-xs text-zinc-600 bg-black/30 rounded-xl px-4 py-2.5"><span className="text-amber-500">Order ID:</span> {tx.orderId}</div>}
+                      {tx.note && <div className="mt-4 text-sm text-zinc-400 bg-black/30 rounded-xl p-4"><Icon name="file" size={12} className="inline mr-2 text-zinc-600" /><span className="whitespace-pre-wrap">{tx.note}</span></div>}
+                      {tx.screenshot && <img src={tx.screenshot} alt="" className="mt-4 rounded-2xl max-h-48 object-cover" />}
+                      
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-800/50">
+                        <div className="flex items-center gap-2">
+                          <Avatar userId={tx.recordedBy} size={20} />
+                          <span className="text-xs text-zinc-600">{txt.createdBy.replace('{name}', users[tx.recordedBy]?.name || '')}</span>
+                        </div>
+                        <div className="flex gap-1 ml-auto">
+                          <button onClick={() => editTransaction(tx)} className="p-2 text-zinc-600 hover:text-white hover:bg-zinc-800 rounded-lg transition"><Icon name="edit" size={14} /></button>
+                          <button onClick={() => deleteTransaction(tx.id)} className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition"><Icon name="trash" size={14} /></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ADD */}
+            {view === 'add' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-light text-center text-white tracking-tight">{editingId ? txt.edit : txt.add}</h2>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setForm({ ...form, type: 'binance', counterparty: getCounterparty(), sender: '', recipient: '' })}
+                    className={`p-5 rounded-2xl font-medium transition-all border ${form.type === 'binance' ? 'bg-amber-500/10 border-amber-800 text-amber-500' : 'bg-zinc-900/50 border-zinc-900 text-zinc-500'}`}>
+                    <div className="text-2xl mb-2">🔶</div><div className="text-sm">{txt.binance}</div>
+                  </button>
+                  <button onClick={() => setForm({ ...form, type: 'onchain' })}
+                    className={`p-5 rounded-2xl font-medium transition-all border ${form.type === 'onchain' ? 'bg-red-500/10 border-red-800 text-red-500' : 'bg-zinc-900/50 border-zinc-900 text-zinc-500'}`}>
+                    <div className="text-2xl mb-2">⛓️</div><div className="text-sm">{txt.onchain}</div>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setForm({ ...form, direction: 'in' })}
+                    className={`p-5 rounded-2xl font-medium transition-all border flex flex-col items-center ${form.direction === 'in' ? 'bg-emerald-500/10 border-emerald-800' : 'bg-zinc-900/50 border-zinc-900'}`}>
+                    <Icon name="arrowDown" size={20} className={form.direction === 'in' ? 'text-emerald-500' : 'text-zinc-600'} />
+                    <span className={`mt-2 text-sm ${form.direction === 'in' ? 'text-emerald-500' : 'text-zinc-500'}`}>{txt.receive}</span>
+                    {form.type === 'binance' && <span className="text-xs text-zinc-600 mt-1">{txt.from} {getCounterparty()}</span>}
+                  </button>
+                  <button onClick={() => setForm({ ...form, direction: 'out' })}
+                    className={`p-5 rounded-2xl font-medium transition-all border flex flex-col items-center ${form.direction === 'out' ? 'bg-red-500/10 border-red-800' : 'bg-zinc-900/50 border-zinc-900'}`}>
+                    <Icon name="arrowUp" size={20} className={form.direction === 'out' ? 'text-red-500' : 'text-zinc-600'} />
+                    <span className={`mt-2 text-sm ${form.direction === 'out' ? 'text-red-500' : 'text-zinc-500'}`}>{txt.send}</span>
+                    {form.type === 'binance' && <span className="text-xs text-zinc-600 mt-1">{txt.to} {getCounterparty()}</span>}
+                  </button>
+                </div>
+
+                {form.type === 'binance' && (
+                  <div className="bg-zinc-900/50 border border-zinc-900 rounded-2xl p-5 space-y-4">
+                    <label className="block bg-black/30 border border-dashed border-zinc-800 rounded-2xl p-6 text-center cursor-pointer hover:border-zinc-700 transition">
+                      <Icon name="camera" size={24} className="mx-auto text-zinc-600 mb-2" />
+                      <span className="text-zinc-500 text-sm">{txt.uploadScreenshot}</span>
+                      <input type="file" accept="image/*" onChange={handleScreenshotUpload} className="hidden" />
+                    </label>
+                    {form.screenshot && (
+                      <div className="relative">
+                        <img src={form.screenshot} alt="" className="rounded-2xl max-h-40 object-cover w-full" />
+                        <button onClick={() => setForm({ ...form, screenshot: null })} className="absolute top-2 right-2 p-1 bg-black/50 rounded-full"><Icon name="x" size={16} className="text-white" /></button>
+                      </div>
+                    )}
+                    <input type="text" placeholder={txt.orderId} value={form.orderId} onChange={(e) => setForm({ ...form, orderId: e.target.value })} className="w-full bg-black/30 border border-zinc-800 rounded-xl p-4 text-white text-sm focus:border-amber-800 outline-none" />
+                  </div>
+                )}
+
+                {form.type === 'onchain' && (
+                  <div className="bg-zinc-900/50 border border-zinc-900 rounded-2xl p-5 space-y-4">
+                    <div className="text-zinc-500 text-sm mb-2">{txt.selectChain}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {chains.map(chain => (
+                        <button key={chain.id} onClick={() => setForm({ ...form, chain: chain.id })}
+                          className={`px-4 py-2 rounded-xl text-sm transition ${form.chain === chain.id ? 'bg-zinc-800' : 'bg-black/30'}`}
+                          style={form.chain === chain.id ? { color: chain.color } : { color: '#71717a' }}>{chain.name}</button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder={txt.txHash} value={form.txHash} onChange={(e) => setForm({ ...form, txHash: e.target.value.trim() })} className="flex-1 bg-black/30 border border-zinc-800 rounded-xl p-4 text-white text-sm focus:border-red-800 outline-none font-mono" />
+                      <button onClick={fetchTransaction} disabled={txLoading} className="bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 rounded-xl px-5 transition flex items-center gap-2">
+                        {txLoading ? <Icon name="loader" size={16} /> : <Icon name="search" size={16} className="text-white" />}
+                      </button>
+                    </div>
+                    {txError && <p className="text-red-400 text-sm">{txError}</p>}
+                    {form.txHash && <button onClick={openExplorer} className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"><Icon name="externalLink" size={12} />{txt.viewOnExplorer}</button>}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-zinc-500 mb-1 block">{txt.sender}</label><input type="text" placeholder="0x..." value={form.sender} onChange={(e) => setForm({ ...form, sender: e.target.value })} className="w-full bg-black/30 border border-zinc-800 rounded-xl p-3 text-white text-xs focus:border-red-800 outline-none font-mono" /></div>
+                      <div><label className="text-xs text-zinc-500 mb-1 block">{txt.recipient}</label><input type="text" placeholder="0x..." value={form.recipient} onChange={(e) => setForm({ ...form, recipient: e.target.value })} className="w-full bg-black/30 border border-zinc-800 rounded-xl p-3 text-white text-xs focus:border-red-800 outline-none font-mono" /></div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <input type="number" placeholder={txt.amount} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="flex-1 bg-zinc-900/50 border border-zinc-900 rounded-2xl p-5 text-white text-xl font-light focus:border-zinc-700 outline-none" />
+                  <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="bg-zinc-900/50 border border-zinc-900 rounded-2xl px-5 text-white focus:border-zinc-700 outline-none">
+                    {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="text-zinc-500 text-sm mb-3">{txt.category}</div>
+                  <div className="flex gap-2">
+                    {categories.map(cat => (
+                      <button key={cat.id} onClick={() => setForm({ ...form, category: cat.id })}
+                        className={`px-5 py-3 rounded-xl text-sm transition ${form.category === cat.id ? 'bg-red-900/30 text-red-500 border border-red-900' : 'bg-zinc-900/50 text-zinc-500 border border-zinc-900'}`}>{cat[lang]}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-zinc-500 text-sm mb-3">{txt.date}</div>
+                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-900 rounded-2xl p-4 text-white focus:border-zinc-700 outline-none" />
+                </div>
+
+                <textarea placeholder={txt.note} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full bg-zinc-900/50 border border-zinc-900 rounded-2xl p-5 text-white h-24 resize-none focus:border-zinc-700 outline-none" />
+
+                <button onClick={addTransaction} className="w-full bg-red-900 hover:bg-red-800 rounded-2xl p-5 font-medium text-white flex items-center justify-center gap-2 transition">
+                  <Icon name="check" size={18} />{editingId ? txt.update : txt.save}
+                </button>
+                
+                {editingId && <button onClick={() => { setEditingId(null); resetForm(); setView('list'); }} className="w-full bg-zinc-900/50 border border-zinc-900 rounded-2xl p-4 text-zinc-500 hover:text-white transition">{txt.cancel}</button>}
+              </div>
+            )}
+
+            {/* STATS */}
+            {view === 'stats' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-light text-white tracking-tight">{txt.stats}</h2>
+                  <button onClick={exportToCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-900/30 text-emerald-500 rounded-xl text-sm hover:bg-emerald-900/50 transition">
+                    <Icon name="download" size={16} />{txt.exportExcel}
+                  </button>
+                </div>
+
+                <div className="bg-zinc-900/50 border border-zinc-900 rounded-3xl p-6">
+                  <h3 className="text-sm text-zinc-500 mb-5">{txt.personalStats}</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {['hedda', 'joe'].map(userId => (
+                      <div key={userId} className="bg-black/30 rounded-2xl p-5 text-center">
+                        <Avatar userId={userId} size={56} />
+                        <div className="font-medium mt-3" style={{ color: users[userId].color }}>{users[userId].name}</div>
+                        <div className="text-xs text-zinc-600 mt-3 space-y-1">
+                          <div>{txt.income} <span className="text-emerald-500">+{stats.byUser[userId].in.toFixed(2)}</span></div>
+                          <div>{txt.expense} <span className="text-red-500">-{stats.byUser[userId].out.toFixed(2)}</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="bg-zinc-900/50 border border-zinc-900 rounded-3xl p-6">
+                  <h3 className="text-sm text-zinc-500 mb-5">{txt.currencyStats}</h3>
+                  {Object.keys(stats.byCurrency).length === 0 ? <p className="text-zinc-600 text-sm">{txt.noData}</p> : (
+                    <div className="space-y-3">
+                      {Object.entries(stats.byCurrency).map(([currency, data]) => (
+                        <div key={currency} className="flex items-center justify-between bg-black/30 rounded-xl p-4">
+                          <span className="font-medium text-white">{currency}</span>
+                          <div className="text-sm"><span className="text-emerald-500">+{data.in.toFixed(2)}</span><span className="text-zinc-700 mx-2">/</span><span className="text-red-500">-{data.out.toFixed(2)}</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="bg-zinc-900/50 border border-zinc-900 rounded-3xl p-6">
+                  <h3 className="text-sm text-zinc-500 mb-5">{txt.expenseCategory}</h3>
+                  {Object.keys(stats.byCategory).length === 0 ? <p className="text-zinc-600 text-sm">{txt.noData}</p> : (
+                    <div className="space-y-4">
+                      {Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => (
+                        <div key={cat}>
+                          <div className="flex justify-between text-sm mb-2"><span className="text-zinc-400">{getCategoryLabel(cat)}</span><span className="text-white">{amount.toFixed(2)} ({((amount / stats.totalOut) * 100).toFixed(0)}%)</span></div>
+                          <div className="h-1.5 bg-black rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-red-900 to-red-700 rounded-full transition-all" style={{ width: `${(amount / stats.totalOut) * 100}%` }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Nav */}
+          <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-6 py-4 flex justify-around items-center">
+            <button onClick={() => setView('list')} className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition ${view === 'list' ? 'text-red-500' : 'text-zinc-600'}`}>
+              <Icon name="list" size={22} /><span className="text-xs">{txt.records}</span>
+            </button>
+            <button onClick={() => { setEditingId(null); resetForm(); setView('add'); }} className="-mt-8">
+              <div className="w-14 h-14 bg-red-900 rounded-2xl flex items-center justify-center shadow-xl shadow-red-900/30 hover:bg-red-800 transition">
+                <Icon name="plus" size={26} className="text-white" />
+              </div>
+            </button>
+            <button onClick={() => setView('stats')} className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition ${view === 'stats' ? 'text-red-500' : 'text-zinc-600'}`}>
+              <Icon name="chart" size={22} /><span className="text-xs">{txt.stats}</span>
+            </button>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<CryptoTracker />);
+  </script>
+</body>
+</html>
