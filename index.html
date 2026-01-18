@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Capital Vault</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Capital Vault">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="mobile-web-app-capable" content="yes">
+  
+  <!-- PWA Icons -->
+  <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAACvElEQVR4nO3cMU7DQBBA0QVR+QrchPuLm3AOqJCiFAESS2a+36tTbPE18u7aedq27XNBxPPRC4A9CZoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJqUl6MXcOnj7e3oJXCn1/f3o5ew1jKhiRE0KYImRdCkCJoUQZMiaFL+1Tn0T/7LWecZTbkjMKFJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZl1LscU94n4DgmNCmCJkXQpAiaFEGTImhSBE3KqHNo3xQeZ8odgAlNiqBJETQpgiZl1KZwysaE45jQpAiaFEGTImhSBE2KoEkRNCmjzqG9nHScKXcAJjQpgiZF0KQImhRBkyJoUgRNiqBJGXWxwv1uXYyULqwEHfebG77v3xTC9sgR9tfr6inX27cIOureOKdHLeigR6OcHLWgY/aKcWrUgiZF0CF7T9WJU9qx3clcHs1NDPYnJvSJXJ8zF86drwmaFEGTIugTuX5mLj5D2xSeTDHiSyZ0yN6bvImbRkGTIuiYvabqxOm8lqCTHo1xasxrCTrr3ignx7yWoNP+Guf0mNdybJf3HalvCkkpRXuLRw5SBE2KoEkRNCmCJkXQpAiaFEGTImhSBE2KoEkRNCmCJkXQpAiaFEGTImhSBE2KoEkRNCmCJmXUV9/1f87kcSY0KYImRdCkCJoUQZMiaFIETcrTtm2fRy8C9mJCkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNyhfruEnGljwIXgAAAABJRU5ErkJggg==">
+  <link rel="icon" type="image/svg+xml" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAACvElEQVR4nO3cMU7DQBBA0QVR+QrchPuLm3AOqJCiFAESS2a+36tTbPE18u7aedq27XNBxPPRC4A9CZoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJoUQZMiaFIETYqgSRE0KYImRdCkCJqUl6MXcOnj7e3oJXCn1/f3o5ew1jKhiRE0KYImRdCkCJoUQZMiaFL+1Tn0T/7LWecZTbkjMKFJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZl1LscU94n4DgmNCmCJkXQpAiaFEGTImhSBE3KqHNo3xQeZ8odgAlNiqBJETQpgiZl1KZwysaE45jQpAiaFEGTImhSBE2KoEkRNCmjzqG9nHScKXcAJjQpgiZF0KQImhRBkyJoUgRNiqBJGXWxwv1uXYyULqwEHfebG77v3xTC9sgR9tfr6inX27cIOureOKdHLeigR6OcHLWgY/aKcWrUgiZF0CF7T9WJU9qx3clcHs1NDPYnJvSJXJ8zF86drwmaFEGTIugTuX5mLj5D2xSeTDHiSyZ0yN6bvImbRkGTIuiYvabqxOm8lqCTHo1xasxrCTrr3ignx7yWoNP+Guf0mNdybJf3HalvCkkpRXuLRw5SBE2KoEkRNCmCJkXQpAiaFEGTImhSBE2KoEkRNCmCJkXQpAiaFEGTImhSBE2KoEkRNCmCJmXUV9/1f87kcSY0KYImRdCkCJoUQZMiaFIETcrTtm2fRy8C9mJCkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNiqBJETQpgiZF0KQImhRBkyJoUgRNyhfruEnGljwIXgAAAABJRU5ErkJggg==">
+  
+  <!-- PWA Manifest (inline) -->
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkNhcGl0YWwgVmF1bHQiLAogICJzaG9ydF9uYW1lIjogIkNhcGl0YWwiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBhMGEwYSIsCiAgInRoZW1lX2NvbG9yIjogIiMwYTBhMGEiLAogICJpY29ucyI6IFsKICAgIHsKICAgICAgInNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSGRwWkhSb1BTSXhPREFpSUdobGFXZG9kRDBpTVRnd0lpQjJhV1YzUW05NFBTSXdJREFnTVRnd0lERTRNQ0krQ2lBZ1BISmxZM1FnZDJsa2RHZzlJakU0TUNJZ2FHVnBaMmgwUFNJeE9EQWlJSEo0UFNJMExqSWlJR1pwYkd3OUlpTXdZVEJoTUdFaUx6NEtJQ0E4WnlCMGNtRnVjMlp2Y20wOUluUnlZVzV6YkdGMFpTZzBNQ3dnTkRBcElqNEtJQ0FnSUR4d1lYUm9JR1E5SWswNE5TQXlOVll4TldFMUlEVWdNQ0F3SURBdE5TMDFTREl3WVRFd0lERXdJREFnTUNBd0lEQWdNakJvTnpWaE5TQTFJREFnTUNBeElEVWdOWFl5TUVneE5XRXhNQ0F4TUNBd0lEQWdNQ0F3SURJd2FEZzFZVFVnTlNBd0lEQWdNQ0ExTFRWMkxURXdZVFVnTlNBd0lEQWdNQzAxTFRVaUlITjBjbTlyWlQwaUkyVm1ORFEwTkNJZ2MzUnliMnRsTFhkcFpIUm9QU0kyWXlJZ1ptbHNiRDBpYm05dVpTSWdjM1J5YjJ0bExXeHBibVZqWVhBOUluSnZkVzVrSWlCemRISnZhMlV0YkdsdVpXcHZhVzQ5SW5KdmRXNWtJaTgrQ2lBZ0lDQThjR0YwYUNCa1BTSk5NVEFNTTFZM01HRXhNQ0F4TUNBd0lEQWdNQ0F4TUNBeE1HZzNOV0UxSURVZ01DQXdJREFnTlMwMWRpMHlNQ0lnYzNSeWIydGxQU0lqWldZME5EUTBJaUJ6ZEhKdmEyVXRkMmxrZEdnOUlqWmpJaUJtYVd4c1BTSnViMjVsSWlCemRISnZhMlV0YkdsdVpXTmhjRDBpY205MWJtUWlJSE4wY205clpTMXNhVzVsYW05cGJqMGljbTkxYm1RaUx6NEtJQ0E4TDJjK0Nqd3ZjM1puUGc9PSIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIKICAgIH0KICBdCn0=">
+  
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -411,13 +426,25 @@ function CapitalVault() {
   
   // ========== Firebase 數據同步 ==========
   useEffect(() => {
+    // 檢查本地登入狀態（24小時內有效）
+    const savedLogin = localStorage.getItem('capitalvault_login');
+    if (savedLogin) {
+      const { user, timestamp } = JSON.parse(savedLogin);
+      const dayInMs = 24 * 60 * 60 * 1000;
+      if (Date.now() - timestamp < dayInMs) {
+        setCurrentUser(user);
+      } else {
+        localStorage.removeItem('capitalvault_login');
+      }
+    }
+    
     // 監聽交易數據
     const unsubTx = db.collection('transactions').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
       const txs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setTransactions(txs);
       setDataLoading(false);
     });
-    // 監聽通知
+    // 監聯通知
     const unsubNotif = db.collection('notifications').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
       const notifs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
       setNotifications(notifs);
@@ -434,7 +461,19 @@ function CapitalVault() {
         setSuiWallets(wallets);
       }
     });
-    return () => { unsubTx(); unsubNotif(); unsubCat(); unsubWallet(); };
+    // 監聽頭像
+    const unsubAvatars = db.collection('settings').doc('avatars').onSnapshot(doc => {
+      if (doc.exists) {
+        setAvatars(doc.data());
+      }
+    });
+    // 監聽封面
+    const unsubCovers = db.collection('settings').doc('covers').onSnapshot(doc => {
+      if (doc.exists) {
+        setCovers(doc.data());
+      }
+    });
+    return () => { unsubTx(); unsubNotif(); unsubCat(); unsubWallet(); unsubAvatars(); unsubCovers(); };
   }, []);
   // ========== Firebase 同步結束 ==========
   
@@ -719,6 +758,11 @@ function CapitalVault() {
       setForm(prev => ({ ...prev, counterparty: selectedUser === 'hedda' ? 'Joe' : 'Hedda' }));
       setPassword('');
       setPasswordError(false);
+      // 儲存登入狀態（24小時有效）
+      localStorage.setItem('capitalvault_login', JSON.stringify({
+        user: selectedUser,
+        timestamp: Date.now()
+      }));
     } else {
       setPasswordError(true);
       setTimeout(() => setPasswordError(false), 500);
@@ -732,7 +776,12 @@ function CapitalVault() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setAvatars(prev => ({ ...prev, [userId]: reader.result }));
+      reader.onloadend = () => {
+        const avatarData = reader.result;
+        setAvatars(prev => ({ ...prev, [userId]: avatarData }));
+        // Firebase: 同步頭像
+        db.collection('settings').doc('avatars').set({ [userId]: avatarData }, { merge: true });
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -1686,7 +1735,12 @@ function CapitalVault() {
                 const file = e.target.files?.[0];
                 if (file) {
                   const reader = new FileReader();
-                  reader.onloadend = () => setCovers(prev => ({ ...prev, [currentBook]: reader.result }));
+                  reader.onloadend = () => {
+                    const coverData = reader.result;
+                    setCovers(prev => ({ ...prev, [currentBook]: coverData }));
+                    // Firebase: 同步封面
+                    db.collection('settings').doc('covers').set({ [currentBook]: coverData }, { merge: true });
+                  };
                   reader.readAsDataURL(file);
                 }
                 e.target.value = '';
@@ -1746,7 +1800,7 @@ function CapitalVault() {
               <button onClick={toggleLang} className="icon-btn" style={{ padding: 10, background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', borderRadius: 10 }}>
                 <Icon name="globe" size={18} />
               </button>
-              <button onClick={() => setCurrentUser(null)} className="icon-btn" style={{ padding: 10, background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', borderRadius: 10 }}>
+              <button onClick={() => { setCurrentUser(null); localStorage.removeItem('capitalvault_login'); }} className="icon-btn" style={{ padding: 10, background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', borderRadius: 10 }}>
                 <Icon name="logout" size={18} />
               </button>
             </div>
