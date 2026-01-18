@@ -385,7 +385,7 @@ const globalStyles = `
   }
 `;
 
-export default function CapitalVault() {
+function CapitalVault() {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [password, setPassword] = useState('');
@@ -2835,7 +2835,7 @@ export default function CapitalVault() {
             <span style={{ fontSize: 11, fontWeight: 600 }}>{txt.records}</span>
           </button>
           
-          <button onClick={() => { setEditingId(null); resetForm(); setView('add'); }} style={{ marginTop: -32 }}>
+          <button onClick={() => { setEditingId(null); resetForm(); setView('add'); }} style={{ marginTop: -32, background: 'transparent', border: 'none', padding: 0 }}>
             <div className="btn-primary" style={{
               width: 60, height: 60, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
             }}>
