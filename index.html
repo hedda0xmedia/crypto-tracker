@@ -549,6 +549,7 @@ function CapitalVault() {
     date: new Date().toISOString().split('T')[0], 
     chain: 'bsc', book: 'work',
     txHash: '', sender: '', recipient: '', orderId: '',
+    senderIs: null, recipientIs: null, // 發送方/接收方是誰
     // 項目收益相關
     projectName: '',
     distribution: {
@@ -569,7 +570,7 @@ function CapitalVault() {
       onchain: '鏈上轉帳', receive: '收款', send: '轉出', from: '來自', to: '轉給',
       amount: '金額', category: '分類', note: '備註', save: '保存', update: '更新',
       cancel: '取消', date: '日期', personalStats: '個人統計', currencyStats: '幣種統計',
-      expenseCategory: '支出分類', noData: '暫無數據', exportCSV: '導出 Excel',
+      incomeCategory: '收入分類', expenseCategory: '支出分類', noData: '暫無數據', exportCSV: '導出 Excel',
       confirmDelete: '確定要刪除？', enterAmount: '請填寫金額', createdBy: '由 {name} 創建',
       selectChain: '選擇鏈', txHash: '交易哈希 (TX Hash)', sender: '發送方', recipient: '接收方',
       txNotFound: '找不到交易', queryFailed: '查詢失敗', viewOnExplorer: '在瀏覽器查看',
@@ -593,7 +594,7 @@ function CapitalVault() {
       onchain: 'On-chain', receive: 'Receive', send: 'Send', from: 'From', to: 'To',
       amount: 'Amount', category: 'Category', note: 'Note', save: 'Save', update: 'Update',
       cancel: 'Cancel', date: 'Date', personalStats: 'Personal Stats', currencyStats: 'Currency Stats',
-      expenseCategory: 'Expense by Category', noData: 'No data', exportCSV: 'Export Excel',
+      incomeCategory: 'Income by Category', expenseCategory: 'Expense by Category', noData: 'No data', exportCSV: 'Export Excel',
       confirmDelete: 'Delete this record?', enterAmount: 'Please enter amount', createdBy: 'By {name}',
       selectChain: 'Select Chain', txHash: 'TX Hash', sender: 'Sender', recipient: 'Recipient',
       txNotFound: 'Transaction not found', queryFailed: 'Query failed', viewOnExplorer: 'View on Explorer',
@@ -624,7 +625,7 @@ function CapitalVault() {
   // 合併預設分類和自定義分類
   const allCategories = [...categories.filter(c => !c.isCustomizable), ...customCategories, categories.find(c => c.isCustomizable)];
   
-  const currencies = ['USDT', 'USDC', 'ETH', 'BNB', 'SUI', 'BTC', 'TWD', 'USD'];
+  const currencies = ['USDT', 'USDC', 'ETH', 'BNB', 'SUI', 'BTC', 'TWD', 'USD', 'DEEP', 'NS', 'CETUS', 'BUCK', 'haSUI', 'afSUI', 'vSUI', 'BLUB', 'FUD'];
   const chains = [
     { id: 'bsc', name: 'BSC', symbol: 'BNB', explorer: 'https://bscscan.com/tx/', color: '#F3BA2F' },
     { id: 'eth', name: 'Ethereum', symbol: 'ETH', explorer: 'https://etherscan.io/tx/', color: '#627EEA' },
@@ -881,6 +882,7 @@ function CapitalVault() {
       counterparty: getCounterparty(), note: '', screenshot: null,
       date: new Date().toISOString().split('T')[0],
       chain: 'bsc', book: currentBook, txHash: '', sender: '', recipient: '', orderId: '',
+      senderIs: null, recipientIs: null,
       projectName: '',
       distribution: {
         oxmedia: { amount: '', txOrOrder: '', chain: 'sui' },
@@ -916,17 +918,88 @@ function CapitalVault() {
           const tx = data.result;
           const sender = tx.transaction?.data?.sender || '';
           const balanceChanges = tx.balanceChanges || [];
-          let amount = 0, recipient = '';
+          let amount = 0, recipient = '', currency = 'SUI';
+          
+          // 代幣小數位對照表（coinType 關鍵字 -> [幣種名, 小數位]）
+          const tokenDecimals = {
+            '::sui::SUI': ['SUI', 9],
+            '0x2::sui::SUI': ['SUI', 9],
+            '::usdc::USDC': ['USDC', 6],
+            'usdc': ['USDC', 6],
+            '::usdt::USDT': ['USDT', 6],
+            'usdt': ['USDT', 6],
+            '::weth::WETH': ['WETH', 8],
+            'weth': ['WETH', 8],
+            '::deep::DEEP': ['DEEP', 6],
+            'deep': ['DEEP', 6],
+            'deeplayer': ['DEEP', 6],
+            '::ns::NS': ['NS', 6],
+            'suins': ['NS', 6],
+            '::cetus::CETUS': ['CETUS', 9],
+            'cetus': ['CETUS', 9],
+            '::buck::BUCK': ['BUCK', 9],
+            'buck': ['BUCK', 9],
+            '::blub::BLUB': ['BLUB', 2],
+            'blub': ['BLUB', 2],
+            '::fud::FUD': ['FUD', 5],
+            'fud': ['FUD', 5],
+            '::hasui::HASUI': ['haSUI', 9],
+            'hasui': ['haSUI', 9],
+            '::afsui::AFSUI': ['afSUI', 9],
+            'afsui': ['afSUI', 9],
+            '::vsui::VSUI': ['vSUI', 9],
+            'vsui': ['vSUI', 9],
+          };
+          
+          // 找到正向的餘額變化（接收方）
           for (const bc of balanceChanges) {
-            const amt = parseFloat(bc.amount) / 1e9;
-            if (amt > 0 && bc.owner?.AddressOwner !== sender) {
-              amount = amt; recipient = bc.owner?.AddressOwner || ''; break;
+            const rawAmount = parseFloat(bc.amount);
+            if (rawAmount > 0 && bc.owner?.AddressOwner !== sender) {
+              const coinType = (bc.coinType || '0x2::sui::SUI').toLowerCase();
+              let decimals = 9; // 默認 9 位
+              currency = 'SUI';
+              
+              // 嘗試匹配代幣
+              for (const [key, [name, dec]] of Object.entries(tokenDecimals)) {
+                if (coinType.includes(key.toLowerCase())) {
+                  currency = name;
+                  decimals = dec;
+                  break;
+                }
+              }
+              
+              // 如果未匹配，從 coinType 提取名稱
+              if (currency === 'SUI' && !coinType.includes('sui')) {
+                const parts = bc.coinType?.split('::') || [];
+                currency = parts[parts.length - 1]?.toUpperCase() || 'Unknown';
+                // 嘗試根據數字大小猜測小數位
+                if (rawAmount > 1e15) decimals = 18;
+                else if (rawAmount > 1e12) decimals = 12;
+                else if (rawAmount > 1e9) decimals = 9;
+                else if (rawAmount > 1e6) decimals = 6;
+                else decimals = 9;
+              }
+              
+              amount = rawAmount / Math.pow(10, decimals);
+              recipient = bc.owner?.AddressOwner || '';
+              console.log('Token detected:', { coinType: bc.coinType, currency, decimals, rawAmount, amount });
+              break;
             }
           }
-          if (amount === 0 && balanceChanges.length > 0) amount = Math.abs(parseFloat(balanceChanges[0].amount)) / 1e9;
+          
+          // 如果沒找到正向變化，取第一個的絕對值
+          if (amount === 0 && balanceChanges.length > 0) {
+            const bc = balanceChanges[0];
+            const coinType = bc.coinType || '0x2::sui::SUI';
+            let decimals = 9;
+            if (coinType.includes('::usdc::USDC') || coinType.includes('usdc')) decimals = 6;
+            else if (coinType.includes('::usdt::USDT') || coinType.includes('usdt')) decimals = 6;
+            amount = Math.abs(parseFloat(bc.amount)) / Math.pow(10, decimals);
+          }
+          
           const timestampMs = tx.timestampMs ? parseInt(tx.timestampMs) : Date.now();
           const txDate = new Date(timestampMs).toISOString().split('T')[0];
-          setForm(prev => ({ ...prev, amount: amount.toFixed(4), currency: 'SUI', sender, recipient: recipient || '', date: txDate }));
+          setForm(prev => ({ ...prev, amount: amount.toFixed(1), currency, sender, recipient: recipient || '', date: txDate }));
         } else setTxError(txt.txNotFound);
       } else {
         const rpcEndpoints = { 
@@ -955,7 +1028,7 @@ function CapitalVault() {
               }
             } catch (e) { console.log('Block fetch error:', e); }
           }
-          setForm(prev => ({ ...prev, amount: value > 0 ? value.toFixed(6) : prev.amount, currency: chain?.symbol || 'ETH', sender: tx.from || '', recipient: tx.to || '', date: txDate }));
+          setForm(prev => ({ ...prev, amount: value > 0 ? value.toFixed(1) : prev.amount, currency: chain?.symbol || 'ETH', sender: tx.from || '', recipient: tx.to || '', date: txDate }));
         } else setTxError(txt.txNotFound);
       }
     } catch (error) {
@@ -1175,10 +1248,14 @@ function CapitalVault() {
     
     // 原本的邏輯
     if (!form.amount || parseFloat(form.amount) <= 0) { alert(txt.enterAmount); return; }
+    
+    // 如果是編輯，保留原始創建人
+    const originalTx = editingId ? transactions.find(t => t.id === editingId) : null;
     const newTx = {
       id: editingId || Date.now().toString(), ...form,
       amount: parseFloat(form.amount), timestamp: new Date(form.date).getTime(),
-      recordedBy: currentUser, createdAt: Date.now()
+      recordedBy: originalTx?.recordedBy || currentUser, // 保留原始創建人
+      createdAt: originalTx?.createdAt || Date.now()
     };
     // Firebase: 保存交易
     db.collection('transactions').doc(newTx.id).set(newTx);
@@ -1472,6 +1549,16 @@ function CapitalVault() {
         return tx.distributionFor === currentUser;
       }
       
+      // 工作帳本中的鏈上轉帳，只有相關用戶才能看到
+      if (currentBook === 'work' && tx.type === 'onchain') {
+        // 創建者一定能看到
+        if (tx.recordedBy === currentUser) return true;
+        // 如果 senderIs 或 recipientIs 選擇了當前用戶，則顯示
+        if (tx.senderIs === currentUser || tx.recipientIs === currentUser) return true;
+        // 否則不顯示
+        return false;
+      }
+      
       return true;
     })
     .filter(tx => {
@@ -1503,10 +1590,15 @@ function CapitalVault() {
   };
 
   const getStats = () => {
-    const stats = { totalIn: 0, totalOut: 0, byCategory: {}, byCurrency: {}, byUser: { hedda: { in: 0, out: 0 }, joe: { in: 0, out: 0 } } };
+    const stats = { totalIn: 0, totalOut: 0, byCategory: {}, byIncomeCategory: {}, byCurrency: {}, byUser: { hedda: { in: 0, out: 0 }, joe: { in: 0, out: 0 } } };
     filteredTransactions.forEach(tx => {
       const adjustedDirection = getDirectionForUser(tx);
-      if (adjustedDirection === 'in') stats.totalIn += tx.amount;
+      if (adjustedDirection === 'in') {
+        stats.totalIn += tx.amount;
+        // 收入分類
+        const incomeCat = tx.type === 'project' ? '項目收益' : (tx.category || '其他');
+        stats.byIncomeCategory[incomeCat] = (stats.byIncomeCategory[incomeCat] || 0) + tx.amount;
+      }
       else { stats.totalOut += tx.amount; stats.byCategory[tx.category] = (stats.byCategory[tx.category] || 0) + tx.amount; }
       if (!stats.byCurrency[tx.currency]) stats.byCurrency[tx.currency] = { in: 0, out: 0 };
       stats.byCurrency[tx.currency][adjustedDirection] += tx.amount;
@@ -1533,6 +1625,27 @@ function CapitalVault() {
         if (counterparty && stats.byUser[counterparty]) {
           const oppositeDir = tx.direction === 'in' ? 'out' : 'in';
           stats.byUser[counterparty][oppositeDir] += tx.amount;
+        }
+      } else if (tx.type === 'onchain') {
+        // 鏈上轉帳：根據 senderIs 和 recipientIs 決定影響誰的統計
+        // 只有明確選擇了 joe/hedda 才會算進對方的統計（不會自動識別）
+        if (tx.recordedBy && stats.byUser[tx.recordedBy]) {
+          stats.byUser[tx.recordedBy][tx.direction] += tx.amount;
+        }
+        
+        // 判斷發送方（只有明確選擇 joe 或 hedda 才算，其他任何值都不算）
+        const senderUser = (tx.senderIs === 'joe' || tx.senderIs === 'hedda') ? tx.senderIs : null;
+        
+        // 判斷接收方（只有明確選擇 joe 或 hedda 才算，其他任何值都不算）
+        const recipientUser = (tx.recipientIs === 'joe' || tx.recipientIs === 'hedda') ? tx.recipientIs : null;
+        
+        // 發送方要記錄支出（必須是 joe/hedda，且不是記錄者本人）
+        if (senderUser && senderUser !== tx.recordedBy && stats.byUser[senderUser]) {
+          stats.byUser[senderUser].out += tx.amount;
+        }
+        // 接收方要記錄收入（必須是 joe/hedda，且不是記錄者本人）
+        if (recipientUser && recipientUser !== tx.recordedBy && stats.byUser[recipientUser]) {
+          stats.byUser[recipientUser].in += tx.amount;
         }
       } else if (tx.recordedBy && stats.byUser[tx.recordedBy]) {
         // 其他類型按 recordedBy 計算
@@ -1989,9 +2102,8 @@ function CapitalVault() {
 
         {/* Stats */}
         <div style={{ padding: '20px 16px', display: 'flex', gap: 12, overflowX: 'auto' }}>
-          <div className={currentBook === '0xmedia' ? 'card-premium' : 'stat-card-income'} 
-            style={currentBook === '0xmedia' ? { flexShrink: 0, borderRadius: 18, padding: 20, minWidth: 110, background: 'linear-gradient(145deg, rgba(74, 158, 232, 0.1) 0%, rgba(20, 20, 20, 0.05) 100%)', border: '1px solid rgba(74, 158, 232, 0.15)' } : { flexShrink: 0, borderRadius: 18, padding: 20, minWidth: 110 }} 
-            className="animate-slideUp">
+          <div className={`animate-slideUp ${currentBook === '0xmedia' ? 'card-premium' : 'stat-card-income'}`} 
+            style={currentBook === '0xmedia' ? { flexShrink: 0, borderRadius: 18, padding: 20, minWidth: 110, background: 'linear-gradient(145deg, rgba(74, 158, 232, 0.1) 0%, rgba(20, 20, 20, 0.05) 100%)', border: '1px solid rgba(74, 158, 232, 0.15)' } : { flexShrink: 0, borderRadius: 18, padding: 20, minWidth: 110 }}>
             <div style={{ color: currentBook === '0xmedia' ? '#4A9EE8' : '#6ee7b7', fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{txt.income}</div>
             <div className="number-display" style={{ color: currentBook === '0xmedia' ? '#4A9EE8' : '#10b981', fontSize: 22, fontWeight: 700 }}>+{stats.totalIn.toFixed(2)}</div>
           </div>
@@ -2548,12 +2660,68 @@ function CapitalVault() {
                       <input type="text" placeholder="0x..." value={form.sender} onChange={(e) => setForm({ ...form, sender: e.target.value })}
                         className="input-premium"
                         style={{ width: '100%', borderRadius: 10, padding: 12, color: 'white', fontSize: 12, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                      {/* 發送方選擇標籤（工作帳本） */}
+                      {form.book === 'work' && (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {(() => {
+                            const otherUser = currentUser === 'hedda' ? 'joe' : 'hedda';
+                            const isOtherUser = form.senderIs === otherUser;
+                            const isExternal = form.senderIs === 'external';
+                            return (
+                              <>
+                                <button type="button" onClick={() => setForm({ ...form, senderIs: isOtherUser ? null : otherUser })}
+                                  style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                    background: isOtherUser ? `${users[otherUser].color}20` : 'rgba(0,0,0,0.3)',
+                                    border: isOtherUser ? `1px solid ${users[otherUser].color}30` : '1px solid transparent',
+                                    color: isOtherUser ? users[otherUser].color : '#555' }}>
+                                  {users[otherUser].name}
+                                </button>
+                                <button type="button" onClick={() => setForm({ ...form, senderIs: isExternal ? null : 'external' })}
+                                  style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                    background: isExternal ? 'rgba(107, 114, 128, 0.15)' : 'rgba(0,0,0,0.3)',
+                                    border: isExternal ? '1px solid rgba(107, 114, 128, 0.3)' : '1px solid transparent',
+                                    color: isExternal ? '#9ca3af' : '#555' }}>
+                                  {lang === 'zh' ? '其他' : 'Other'}
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label style={{ display: 'block', color: '#555', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{txt.recipient}</label>
                       <input type="text" placeholder="0x..." value={form.recipient} onChange={(e) => setForm({ ...form, recipient: e.target.value })}
                         className="input-premium"
                         style={{ width: '100%', borderRadius: 10, padding: 12, color: 'white', fontSize: 12, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                      {/* 接收方選擇標籤（工作帳本） */}
+                      {form.book === 'work' && (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {(() => {
+                            const otherUser = currentUser === 'hedda' ? 'joe' : 'hedda';
+                            const isOtherUser = form.recipientIs === otherUser;
+                            const isExternal = form.recipientIs === 'external';
+                            return (
+                              <>
+                                <button type="button" onClick={() => setForm({ ...form, recipientIs: isOtherUser ? null : otherUser })}
+                                  style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                    background: isOtherUser ? `${users[otherUser].color}20` : 'rgba(0,0,0,0.3)',
+                                    border: isOtherUser ? `1px solid ${users[otherUser].color}30` : '1px solid transparent',
+                                    color: isOtherUser ? users[otherUser].color : '#555' }}>
+                                  {users[otherUser].name}
+                                </button>
+                                <button type="button" onClick={() => setForm({ ...form, recipientIs: isExternal ? null : 'external' })}
+                                  style={{ padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                                    background: isExternal ? 'rgba(107, 114, 128, 0.15)' : 'rgba(0,0,0,0.3)',
+                                    border: isExternal ? '1px solid rgba(107, 114, 128, 0.3)' : '1px solid transparent',
+                                    color: isExternal ? '#9ca3af' : '#555' }}>
+                                  {lang === 'zh' ? '其他' : 'Other'}
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3015,6 +3183,27 @@ function CapitalVault() {
                 );
               })()}
 
+              {/* 收入分類 */}
+              <div className="card-premium" style={{ borderRadius: 18, padding: 20, marginBottom: 18 }}>
+                <h3 style={{ color: '#888', fontSize: 12, fontWeight: 600, marginBottom: 18, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{txt.incomeCategory}</h3>
+                {Object.keys(stats.byIncomeCategory).length === 0 ? <p style={{ color: '#555', fontSize: 14 }}>{txt.noData}</p> : (
+                  <div>
+                    {Object.entries(stats.byIncomeCategory).map(([cat, amount]) => (
+                      <div key={cat} style={{ marginBottom: 18 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <span style={{ color: '#888', fontSize: 14 }}>{getCategoryLabel(cat)}</span>
+                          <span className="number-display" style={{ color: 'white', fontWeight: 600 }}>{amount.toFixed(2)}</span>
+                        </div>
+                        <div style={{ height: 6, background: 'rgba(0,0,0,0.4)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(100, (amount / stats.totalIn) * 100)}%`, borderRadius: 3, background: currentBook === '0xmedia' ? '#4A9EE8' : '#10b981' }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 支出分類 */}
               <div className="card-premium" style={{ borderRadius: 18, padding: 20 }}>
                 <h3 style={{ color: '#888', fontSize: 12, fontWeight: 600, marginBottom: 18, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{txt.expenseCategory}</h3>
                 {Object.keys(stats.byCategory).length === 0 ? <p style={{ color: '#555', fontSize: 14 }}>{txt.noData}</p> : (
